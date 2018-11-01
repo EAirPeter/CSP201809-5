@@ -140,16 +140,6 @@ inline U32 MInv(U32 N) {
     vw = VEx1(vb), \
     VMul3(va, vv, vw, vt, vu, vv, vw) \
 )
-#if 0
-    const __m256i vm0 = _mm256_set_epi64x(
-        0x111111111b1a1918, 0x1111111113121110,
-        0x111111110b0a0908, 0x1111111103020100
-    );
-    const __m256i vm1 = _mm256_set_epi64x(
-        0x111111111f1e1d1c, 0x1111111117161514,
-        0x111111110f0e0d0c, 0x1111111107060504
-    );
-#endif
 
 inline void VMul(U32* __restrict__ A, U32 Len, U32 W) {
     if (Len < 8) {
