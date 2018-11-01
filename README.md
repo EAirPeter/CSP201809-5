@@ -3,7 +3,7 @@ CCF CSP 201809-5 线性递推式
 
 # 问题描述 - The Problem
 ![](img/p1.jpg)  
-![](img/p2.jpg)  
+![](img/p5.jpg)  
 
 # 关于代码 - About the Solution
 代码位于[csp5-final.cpp](csp5-final.cpp)。  
