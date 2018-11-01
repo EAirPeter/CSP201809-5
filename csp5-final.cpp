@@ -278,8 +278,8 @@ inline void NttFwd3(U32* __restrict__ A, U32 Len, U32 Wn) {
         __m128i vb = _mm_load_si128((const __m128i*) (A + j + 4));
         __m128i vc = _mm_add_epi32(va, vb);
         __m128i vd = _mm_sub_epi32(va, vb);
-        __m128i ve = _mm_sub_epi32(vc, _mm_andnot_si128(_mm_cmpgt_epi32(vm32, vc), vm32));
-        __m128i vf = _mm_add_epi32(vd, _mm_and_si128(_mm_cmpgt_epi32(vb, va), vm32));
+        __m128i ve = _mm_min_epu32(vc, _mm_sub_epi32(vc, vm32));
+        __m128i vf = _mm_min_epu32(vd, _mm_add_epi32(vd, vm32));
         _mm_store_si128((__m128i*) (A + j), ve);
         _mm_store_si128((__m128i*) (A + j + 4), vf);
         A[j + 5] = MMul(Wn, A[j + 5]);
@@ -368,8 +368,8 @@ inline void NttInv3(U32* __restrict__ A, U32 Len, U32 Wn) {
         __m128i vb = _mm_load_si128((const __m128i*) (A + j + 4));
         __m128i vc = _mm_add_epi32(va, vb);
         __m128i vd = _mm_sub_epi32(va, vb);
-        __m128i ve = _mm_sub_epi32(vc, _mm_andnot_si128(_mm_cmpgt_epi32(vm32, vc), vm32));
-        __m128i vf = _mm_add_epi32(vd, _mm_and_si128(_mm_cmpgt_epi32(vb, va),vm32));
+        __m128i ve = _mm_min_epu32(vc, _mm_sub_epi32(vc, vm32));
+        __m128i vf = _mm_min_epu32(vd, _mm_add_epi32(vd, vm32));
         _mm_store_si128((__m128i*) (A + j), ve);
         _mm_store_si128((__m128i*) (A + j + 4), vf);
     }
