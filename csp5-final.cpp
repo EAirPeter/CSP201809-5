@@ -3,8 +3,6 @@
 
 #include <immintrin.h>
 
-#include "TimeMe.h"
-
 #include <algorithm>
 #include <cstdio>
 #include <utility>
@@ -109,74 +107,49 @@ inline U32 MInv(U32 N) {
     return (U32) (x < 0 ? x + Mod : x);
 }
 
-inline __m256i VLod(const U32* __restrict__ A) {
-    return _mm256_load_si256((const __m256i*) A);
-}
-
-inline void VSto(U32* __restrict__ A, __m256i v) {
-    _mm256_store_si256((__m256i*) A, v);
-}
-
-inline __m256i VEx0(__m256i v) {
+#define VLod(A) (_mm256_load_si256((const __m256i*) (A)))
+#define VSto(A, v) (_mm256_store_si256((__m256i*) (A), v))
+#define VEx0(v) (_mm256_shuffle_epi8(v, vm0))
+#define VEx1(v) (_mm256_shuffle_epi8(v, vm1))
+#define VIntlv(v0, v1) (_mm256_blend_epi32(v0, _mm256_shuffle_epi32(v1, 0xb1), 0xaa))
+#define VAdd(va, vb, vt) ( \
+    vt = _mm256_add_epi32(va, vb), \
+    _mm256_min_epu32(_mm256_sub_epi32(vt, vm32), vt) \
+)
+#define VSub(va, vb, vt) ( \
+    vt = _mm256_sub_epi32(va, vb), \
+    _mm256_min_epu32(_mm256_add_epi32(vt, vm32), vt) \
+)
+#define VMul4(va0, va1, vb0, vb1, vt, vu, vv, vw) ( \
+    vt = _mm256_mul_epi32(va0, vb0), \
+    vu = _mm256_mul_epi32(va1, vb1), \
+    vv = _mm256_mul_epi32(_mm256_srli_epi64(_mm256_mul_epi32(_mm256_srli_epi64(vt, 29), vbmm), BmW), vm64), \
+    vw = _mm256_mul_epi32(_mm256_srli_epi64(_mm256_mul_epi32(_mm256_srli_epi64(vu, 29), vbmm), BmW), vm64), \
+    vt = VIntlv(vt, vu), \
+    vu = VIntlv(vv, vw), \
+    vt = _mm256_sub_epi32(vt, vu), \
+    _mm256_min_epu32(_mm256_min_epu32(vt, _mm256_add_epi32(vt, vm32)), _mm256_sub_epi32(vt, vm32)) \
+)
+#define VMul3(va, vb0, vb1, vt, vu, vv, vw) ( \
+    vt = VEx0(va), \
+    vu = VEx1(va), \
+    VMul4(vt, vu, vb0, vb1, vt, vu, vv, vw) \
+)
+#define VMul2(va, vb, vt, vu, vv, vw) ( \
+    vv = VEx0(vb), \
+    vw = VEx1(vb), \
+    VMul3(va, vv, vw, vt, vu, vv, vw) \
+)
+#if 0
     const __m256i vm0 = _mm256_set_epi64x(
         0x111111111b1a1918, 0x1111111113121110,
         0x111111110b0a0908, 0x1111111103020100
     );
-    return _mm256_shuffle_epi8(v, vm0);
-}
-
-inline __m256i VEx1(__m256i v) {
     const __m256i vm1 = _mm256_set_epi64x(
         0x111111111f1e1d1c, 0x1111111117161514,
         0x111111110f0e0d0c, 0x1111111107060504
     );
-    return _mm256_shuffle_epi8(v, vm1);
-}
-
-inline __m256i VIntlv(__m256i v0, __m256i v1) {
-    return _mm256_blend_epi32(v0, _mm256_shuffle_epi32(v1, 0xb1), 0xaa);
-}
-
-inline __m256i VAdd(__m256i va, __m256i vb) {
-    const __m256i vm32 = _mm256_set1_epi32(Mod);
-    __m256i vra = _mm256_add_epi32(va, vb);
-    __m256i vrb = _mm256_sub_epi32(vra, vm32);
-    return _mm256_min_epu32(vra, vrb);
-}
-
-inline __m256i VSub(__m256i va, __m256i vb) {
-    const __m256i vm32 = _mm256_set1_epi32(Mod);
-    __m256i vra = _mm256_sub_epi32(va, vb);
-    __m256i vrb = _mm256_add_epi32(vra, vm32);
-    return _mm256_min_epu32(vra, vrb);
-}
-
-inline __m256i VMul(__m256i va0, __m256i va1, __m256i vb0, __m256i vb1) {
-    const __m256i vm32 = _mm256_set1_epi32(Mod);
-    const __m256i vm64 = _mm256_set1_epi64x(Mod);
-    const __m256i vbmm = _mm256_set1_epi64x(BmM);
-    __m256i vmul0 = _mm256_mul_epi32(va0, vb0);
-    __m256i vmul1 = _mm256_mul_epi32(va1, vb1);
-    __m256i vlow = VIntlv(vmul0, vmul1);
-    __m256i vquo0 = _mm256_srli_epi64(_mm256_mul_epi32(_mm256_srli_epi64(vmul0, 29), vbmm), BmW);
-    __m256i vquo1 = _mm256_srli_epi64(_mm256_mul_epi32(_mm256_srli_epi64(vmul1, 29), vbmm), BmW);
-    __m256i vval0 = _mm256_mul_epi32(vquo0, vm64);
-    __m256i vval1 = _mm256_mul_epi32(vquo1, vm64);
-    __m256i vval = VIntlv(vval0, vval1);
-    __m256i vra = _mm256_sub_epi32(vlow, vval);
-    __m256i vrb = _mm256_add_epi32(vra, vm32);
-    __m256i vrc = _mm256_sub_epi32(vra, vm32);
-    __m256i vmin = _mm256_min_epu32(vra, vrb);
-    return _mm256_min_epu32(vmin, vrc);
-}
-
-inline __m256i VMul(__m256i va, __m256i vb0, __m256i vb1) {
-    return VMul(VEx0(va), VEx1(va), vb0, vb1);
-}
-
-inline __m256i VMul(__m256i va, __m256i vb) {
-    return VMul(va, VEx0(vb), VEx1(vb));
-}
+#endif
 
 inline void VMul(U32* __restrict__ A, U32 Len, U32 W) {
     if (Len < 8) {
@@ -184,9 +157,24 @@ inline void VMul(U32* __restrict__ A, U32 Len, U32 W) {
             A[i] = MMul(A[i], W);
         return;
     }
+    const __m256i vm32 = _mm256_set1_epi32(Mod);
+    const __m256i vm64 = _mm256_set1_epi64x(Mod);
+    const __m256i vbmm = _mm256_set1_epi64x(BmM);
+    const __m256i vm0 = _mm256_set_epi64x(
+        0x111111111b1a1918, 0x1111111113121110,
+        0x111111110b0a0908, 0x1111111103020100
+    );
+    const __m256i vm1 = _mm256_set_epi64x(
+        0x111111111f1e1d1c, 0x1111111117161514,
+        0x111111110f0e0d0c, 0x1111111107060504
+    );
+    __m256i vta, vtb, vtc, vtd;
     __m256i vw = _mm256_set1_epi64x(W);
-    for (U32 i = 0; i < Len; i += 8)
-        VSto(A + i, VMul(VLod(A + i), vw, vw));
+    for (U32 i = 0; i < Len; i += 8) {
+        __m256i va = VLod(A + i);
+        __m256i vr = VMul3(va, vw, vw, vta, vtb, vtc, vtd);
+        VSto(A + i, vr);
+    }
 }
 
 inline void VMul(U32* __restrict__ A, const U32* __restrict__ B, U32 Len) {
@@ -195,8 +183,24 @@ inline void VMul(U32* __restrict__ A, const U32* __restrict__ B, U32 Len) {
             A[i] = MMul(A[i], B[i]);
         return;
     }
-    for (U32 i = 0; i < Len; i += 8)
-        VSto(A + i, VMul(VLod(A + i), VLod(B + i)));
+    const __m256i vm32 = _mm256_set1_epi32(Mod);
+    const __m256i vm64 = _mm256_set1_epi64x(Mod);
+    const __m256i vbmm = _mm256_set1_epi64x(BmM);
+    const __m256i vm0 = _mm256_set_epi64x(
+        0x111111111b1a1918, 0x1111111113121110,
+        0x111111110b0a0908, 0x1111111103020100
+    );
+    const __m256i vm1 = _mm256_set_epi64x(
+        0x111111111f1e1d1c, 0x1111111117161514,
+        0x111111110f0e0d0c, 0x1111111107060504
+    );
+    __m256i vta, vtb, vtc, vtd;
+    for (U32 i = 0; i < Len; i += 8) {
+        __m256i va = VLod(A + i);
+        __m256i vb = VLod(B + i);
+        __m256i vr = VMul2(va, vb, vta, vtb, vtc, vtd);
+        VSto(A + i, vr);
+    }
 }
 
 inline void VSqr(U32* __restrict__ A, U32 Len) {
@@ -205,11 +209,24 @@ inline void VSqr(U32* __restrict__ A, U32 Len) {
             A[i] = MMul(A[i], A[i]);
         return;
     }
+    const __m256i vm32 = _mm256_set1_epi32(Mod);
+    const __m256i vm64 = _mm256_set1_epi64x(Mod);
+    const __m256i vbmm = _mm256_set1_epi64x(BmM);
+    const __m256i vm0 = _mm256_set_epi64x(
+        0x111111111b1a1918, 0x1111111113121110,
+        0x111111110b0a0908, 0x1111111103020100
+    );
+    const __m256i vm1 = _mm256_set_epi64x(
+        0x111111111f1e1d1c, 0x1111111117161514,
+        0x111111110f0e0d0c, 0x1111111107060504
+    );
+    __m256i vta, vtb, vtc, vtd;
     for (U32 i = 0; i < Len; i += 8) {
         __m256i va = VLod(A + i);
         __m256i v0 = VEx0(va);
         __m256i v1 = VEx1(va);
-        VSto(A + i, VMul(v0, v1, v0, v1));
+        __m256i vr = VMul4(v0, v1, v0, v1, vta, vtb, vtc, vtd);
+        VSto(A + i, vr);
     }
 }
 
@@ -269,6 +286,18 @@ inline void NttFwd3(U32* __restrict__ A, U32 Len, U32 Wn) {
 inline void NttFwd(U32* __restrict__ A, int Exp) {
     U32 Len = 1u << Exp;
     U32 Wn = WbFwd[Exp];
+    const __m256i vm32 = _mm256_set1_epi32(Mod);
+    const __m256i vm64 = _mm256_set1_epi64x(Mod);
+    const __m256i vbmm = _mm256_set1_epi64x(BmM);
+    const __m256i vm0 = _mm256_set_epi64x(
+        0x111111111b1a1918, 0x1111111113121110,
+        0x111111110b0a0908, 0x1111111103020100
+    );
+    const __m256i vm1 = _mm256_set_epi64x(
+        0x111111111f1e1d1c, 0x1111111117161514,
+        0x111111110f0e0d0c, 0x1111111107060504
+    );
+    __m256i vta, vtb, vtc, vtd;
     for (int i = Exp - 1; i >= 3; --i) {
         U32 ChkSiz = 1u << i;
         U32 tw2 = MMul(Wn, Wn);
@@ -289,11 +318,12 @@ inline void NttFwd(U32* __restrict__ A, int Exp) {
                 __m256i vb = VLod(B_ + k);
                 __m256i vw0 = VEx0(vw);
                 __m256i vw1 = VEx1(vw);
-                __m256i vc = VAdd(va, vb);
-                __m256i vd = VSub(va, vb);
+                __m256i vc = VAdd(va, vb, vta);
+                __m256i vd = VSub(va, vb, vta);
+                __m256i ve = VMul3(vd, vw0, vw1, vta, vtb, vtc, vtd);
                 VSto(A_ + k, vc);
-                VSto(B_ + k, VMul(vd, vw0, vw1));
-                vw = VMul(vw0, vw1, vwn, vwn);
+                VSto(B_ + k, ve);
+                vw = VMul4(vw0, vw1, vwn, vwn, vta, vtb, vtc, vtd);
             }
         }
         Wn = MMul(Wn, Wn);
@@ -363,6 +393,18 @@ inline void NttInv(U32* __restrict__ A, int Exp) {
         VMul(A, Len, LenInv[3]);
         return;
     }
+    const __m256i vm32 = _mm256_set1_epi32(Mod);
+    const __m256i vm64 = _mm256_set1_epi64x(Mod);
+    const __m256i vbmm = _mm256_set1_epi64x(BmM);
+    const __m256i vm0 = _mm256_set_epi64x(
+        0x111111111b1a1918, 0x1111111113121110,
+        0x111111110b0a0908, 0x1111111103020100
+    );
+    const __m256i vm1 = _mm256_set_epi64x(
+        0x111111111f1e1d1c, 0x1111111117161514,
+        0x111111110f0e0d0c, 0x1111111107060504
+    );
+    __m256i vta, vtb, vtc, vtd;
     for (int i = 3; i < Exp; ++i) {
         U32 ChkSiz = 1u << i;
         U32 Wn = Ws[Exp - 1 - i];
@@ -382,11 +424,12 @@ inline void NttInv(U32* __restrict__ A, int Exp) {
             for (U32 k = 0; k < ChkSiz; k += 8) {
                 __m256i vw0 = VEx0(vw);
                 __m256i vw1 = VEx1(vw);
-                __m256i vb = VMul(VLod(B_ + k), vw0, vw1);
-                vw = VMul(vw0, vw1, vwn, vwn);
+                __m256i vbl = VLod(B_ + k);
+                __m256i vb = VMul3(vbl, vw0, vw1, vta, vtb, vtc, vtd);
+                vw = VMul4(vw0, vw1, vwn, vwn, vta, vtb, vtc, vtd);
                 __m256i va = VLod(A_ + k);
-                __m256i vc = VAdd(va, vb);
-                __m256i vd = VSub(va, vb);
+                __m256i vc = VAdd(va, vb, vta);
+                __m256i vd = VSub(va, vb, vta);
                 VSto(A_ + k, vc);
                 VSto(B_ + k, vd);
             }
@@ -495,10 +538,6 @@ void PolyPow(U64 N) {
 }
 
 int main() {
-#if 1
-    freopen("D:\\code\\algo\\std14\\j.txt", "r", stdin);
-    freopen("D:\\code\\algo\\std14\\p.txt", "w", stdout);
-#endif
     FetchAll();
     M = ReadU<U32>();
     U64 L = ReadU<U64>();

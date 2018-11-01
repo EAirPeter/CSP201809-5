@@ -55,20 +55,16 @@ inline __m256i VIntlv(__m256i v0, __m256i v1) {
     return _mm256_blend_epi32(v0, _mm256_shuffle_epi32(v1, 0xb1), 0xaa);
 }
 
-inline __m256i VAddFix(__m256i v) {
-    return _mm256_sub_epi32(v, _mm256_andnot_si256(_mm256_cmpgt_epi32(vm32, v), vm32));
-}
-
-inline __m256i VSubFix(__m256i v) {
-    return _mm256_add_epi32(v, _mm256_and_si256(_mm256_cmpgt_epi32(vzero, v), vm32));
-}
-
 inline __m256i VAdd(__m256i va, __m256i vb) {
-    return VAddFix(_mm256_add_epi32(va, vb));
+    __m256i vra = _mm256_add_epi32(va, vb);
+    __m256i vrb = _mm256_sub_epi32(vra, vm32);
+    return _mm256_min_epu32(vra, vrb);
 }
 
 inline __m256i VSub(__m256i va, __m256i vb) {
-    return VSubFix(_mm256_sub_epi32(va, vb));
+    __m256i vra = _mm256_sub_epi32(va, vb);
+    __m256i vrb = _mm256_add_epi32(vra, vm32);
+    return _mm256_min_epu32(vra, vrb);
 }
 
 inline __m256i VMul(__m256i va0, __m256i va1, __m256i vb0, __m256i vb1) {
@@ -80,7 +76,11 @@ inline __m256i VMul(__m256i va0, __m256i va1, __m256i vb0, __m256i vb1) {
     __m256i vval0 = _mm256_mul_epi32(vquo0, vm64);
     __m256i vval1 = _mm256_mul_epi32(vquo1, vm64);
     __m256i vval = VIntlv(vval0, vval1);
-    return VAddFix(VSubFix(VSub(vlow, vval)));
+    __m256i vra = _mm256_sub_epi32(vlow, vval);
+    __m256i vrb = _mm256_add_epi32(vra, vm32);
+    __m256i vrc = _mm256_sub_epi32(vra, vm32);
+    __m256i vmin = _mm256_min_epu32(vra, vrb);
+    return _mm256_min_epu32(vmin, vrc);
 }
 
 inline __m256i VMul(__m256i va, __m256i vb0, __m256i vb1) {
